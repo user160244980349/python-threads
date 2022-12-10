@@ -1,0 +1,13 @@
+version: '3'
+services:
+
+  # MySQL Service
+  db_test:
+    container_name: db_test
+    build:
+      context: ./mysql
+    tty: true
+    environment:
+      MYSQL_ROOT_PASSWORD: secret
+    ports:
+      - 3306:3306
