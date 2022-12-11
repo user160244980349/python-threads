@@ -1,19 +1,20 @@
 import functools
 import uuid
-import threading
 from datetime import datetime
 from multiprocessing.pool import ThreadPool
-from multiprocessing import Pool
+from multiprocessing import Pool, Process
+from threading import Thread
+
 from mysql.connector import connect
 
 
 thread_count = 12
 
 config = {
-  'user': 'user1',
-  'password': 'secret',
-  'host': 'localhost',
-  'database': 'test_database'
+  "user": "user1",
+  "password": "secret",
+  "host": "localhost",
+  "database": "test_database"
 }
 
 query = "INSERT INTO test_table " \
@@ -52,34 +53,56 @@ def job(data):
         cn.close()
 
 
-class WorkerThread(threading.Thread):
+class WorkerThread(Thread):
     def __init__(self, data):
-        threading.Thread.__init__(self)
+        super().__init__()
         self.data = data
 
     def run(self):
         job(self.data)
 
 
-@timeit(f"threaded time:")
-def threaded(data):
-    threads = [WorkerThread(d) for d in data]
+class WorkerProcess(Process):
+    def __init__(self, data):
+        super().__init__()
+        self.data = data
 
-    for t in threads:
+    def run(self):
+        job(self.data)
+
+
+@timeit(f"threads time:")
+def threads(data):
+    # ths = [WorkerThread(d) for d in data]
+    ths = [Thread(target=job, args=(d,)) for d in data]
+
+    for t in ths:
         t.start()
 
-    for t in threads:
+    for t in ths:
         t.join()
 
 
-@timeit(f"threadpooled time:")
-def threadpooled(data):
+@timeit(f"processes time:")
+def processes(data):
+    # procs = [WorkerProcess(d) for d in data]
+    procs = [Process(target=job, args=(d,)) for d in data]
+
+    for p in procs:
+        p.start()
+
+    for p in procs:
+        p.join()
+
+
+@timeit(f"threadpool time:")
+def threadpool(data):
     with ThreadPool(thread_count) as p:
         p.map(job, data, chunksize=1)
 
 
-@timeit(f"multiproc time:")
-def multiproc(data):
+@timeit(f"processpool time:")
+def processpool(data):
     with Pool(thread_count) as p:
         p.map(job, data, chunksize=1)
 
@@ -102,6 +125,7 @@ def fetchall():
 # sudo docker rm -f $(sudo  docker ps -a -q)
 # sudo docker volume rm $(sudo docker volume ls -q)
 # sudo docker-compose up --build
+# https://github.com/user160244980349/python-threads
 # https://ru.stackoverflow.com/questions/1175448/%D0%94%D0%BB%D1%8F-%D1%87%D0%B5%D0%B3%D0%BE-%D0%BD%D1%83%D0%B6%D0%B5%D0%BD-commit-connection-cursor-%D0%B8-close
 # https://stackoverflow.com/questions/27912048/how-to-handle-mysql-connections-with-python-multithreading
 def main():
@@ -111,11 +135,17 @@ def main():
 
     plain(data)
     print(len(fetchall()))
-    threaded(split)
+
+    threads(split)
     print(len(fetchall()))
-    multiproc(split)
+
+    threadpool(split)
     print(len(fetchall()))
-    threadpooled(split)
+
+    processes(split)
+    print(len(fetchall()))
+
+    processpool(split)
     print(len(fetchall()))
 
 
